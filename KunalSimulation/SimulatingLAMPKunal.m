@@ -22,19 +22,22 @@ save_D = 'Results/';
 plotflag_initial = 1;
 
 %Flag for, and frequency of, plotting release of protons
-plotflag_proton_release = 1;
-plotflag_proton_frequency = 5;
+plotflag_proton_release = 0;
+plotflag_proton_frequency = 10;
+
+plotflag_2d_surface = 1;
+plot_2d_surface_frequency = 10;
 
 %% Reaction
 disp('.')
 
-num_of_mol = 5; % # of initial molecules
+num_of_mol = 1; % # of initial molecules
 solution_height = 1.5E-3; % in metres
 speed_of_front = 1.73E-6 ; % metres per second
 r_initial = 1.25E-6; % in metres
 
 total_time = 40; % time in minutes
-time_step = 5; % in seconds
+time_step = 10; % in seconds
 t = 0:time_step:total_time*60; % in seconds
 
 % Starting time to each cluster is Normal distribution. Values taken from
@@ -72,19 +75,31 @@ disp('.')
 chip.N_x = 78;
 chip.N_y = 56; %N_x x N_y array
 
-% isfeet array
-chip.isfetisfet_separation = 0E-6; %Separation between the edges of neighbouring ISFETs in the y axis
+% isfet array
+chip.isfetisfet_separation = 2E-6; 
+% Distance between isfets and sensor (both dimensions)
+chip.isfet_startSeparation = 2E-6;
+chip.isfeet_endSeprataion = 2E-6; 
+% ISFET dimensions
 chip.isfet_width = 20E-6;
 chip.isfet_length = 20E-6;
+% For plotting
 chip.height_unit = 20E-6;
-chip.z_scale = 0.75;
 
-%Separation between the edge of the chip and the wall of the reaction
+%Calculate the total x and y size of the sensor array
+sensor_xsize = chip.N_x*chip.isfet_width + (chip.N_x-1)*(chip.isfetisfet_separation) + chip.isfet_startSeparation + chip.isfet_endSeparation;
+sensor_ysize = chip.N_y*(chip.isfet_length) + (chip.N_y-1)*(chip.isfetisfet_separation) + chip.isfet_startSeparation + chip.isfet_endSeparation;
+sensor_vol = sensor_xsize*sensor_ysize*solution_height;
+
+%Separation between the edge of the sensor array and the wall of the reaction
 %chamber
-chip.wall_separation_xpos = 0e-6;
-chip.wall_separation_xneg = 0e-6;
-chip.wall_separation_ypos = 0e-6;
-chip.wall_separation_yneg = 0e-6;
+chip.wall_separation_xpos = (1.75e-3 + 2*0.262e-3 - sensor_xsize)/2;
+chip.wall_separation_xneg = chip.wall_separation_xpos;
+chip.wall_separation_ypos = 0;
+chip.wall_separation_yneg = 1.5e-3 - sensor_ysize;
+
+reaction_x_size = sensor_xsize + chip.wall_separation_xpos + chip.wall_separation_xneg;
+reaction_y_size = sensor_ysize + chip.wall_serparation_ypos + chip.wall_separation_yneg;
 
 %% Sensing
 
@@ -92,18 +107,9 @@ chip.wall_separation_yneg = 0e-6;
 % occur
 detection_distance = 0.1E-6;
 
-%% Trapping
-trappingregion_height = 0.5e-3; %all molecules within the box defined by trappingregion_height and trappingregion_chipseparation are trapped
-trappingregion_chipseparation = 0.5e-3; %separation between the chip and the trapping region in the x and y directions
-trapping_percentage = 50; %trap the the x% of molecules with smallest z coordinate
 %% End of Inputs
 
 %% Build Chip
-
-%Calculate the total x and y size of the sensor array
-sensor_xsize = chip.N_x*chip.isfet_width + (chip.N_x-1)*(chip.isfetisfet_separation) + chip.wall_separation_xpos + chip.wall_separation_xneg;
-sensor_ysize = chip.N_y*(chip.isfet_length) + (chip.N_y-1)*(chip.isfetisfet_separation) + chip.wall_separation_ypos + chip.wall_separation_yneg;
-sensor_vol = sensor_xsize*sensor_ysize*solution_height;
 
 max_cluster_radius = max([sensor_xsize, sensor_ysize, solution_height]);
 
@@ -119,7 +125,8 @@ end
 
 %If DNA exists in solution, initialise starting positions of DNA clusters
 if num_of_mol ~= 0
-    clusters = InitialiseClustersRandom(num_of_mol, sensor_xsize, sensor_ysize, solution_height, r_initial);
+    %clusters = InitialiseClustersRandom(num_of_mol, sensor_xsize, sensor_ysize, solution_height, r_initial);
+    clusters = InitializeClusterHeight(num_of_mol, sensor_xsize, sensor_ysize, solution_height, r_initial, 0.9);
 end
 
 %Save all variables to file for future reference
@@ -134,9 +141,7 @@ save(param_file)
 %Array to store the number of protons at each sensor over time. col =
 %sensor, row = time
 sensor_nH = zeros(chip.N_x*chip.N_y, length(t));
-
-%Array to store average nH at sensors over time
-sensor_nH_total = zeros(1, length(t));
+cum_nH = zeros(chip.N_x*chip.N_y, length(t));
 
 %% Visualise
 
@@ -194,11 +199,11 @@ for i = t_start:length(t)-1
         % These are the produced protons
         additions = [clusters.radius(j)*a'+clusters.centre_x(j);clusters.radius(j)*b'+clusters.centre_y(j); clusters.radius(j)*c'+clusters.centre_z(j)];
 
-        % Remove the computed proton positions outside the array
-        additions(:,additions(1,:)>sensor_xsize) = [];
-        additions(:,additions(1,:)<0) = [];
-        additions(:,additions(2,:)>sensor_ysize) = [];
-        additions(:,additions(2,:)<0) = [];
+        % Remove the computed proton positions outside the snsor
+        additions(:,additions(1,:)>sensor_xsize+chip.wall_separation_xpos) = [];
+        additions(:,additions(1,:)<chip.wall_separation_xneg) = [];
+        additions(:,additions(2,:)>sensor_ysize+chip.wall_serparation_ypos) = [];
+        additions(:,additions(2,:)<chip.wall_separation_yneg) = [];
         additions(:,additions(3,:)>solution_height) = [];
         additions(:,additions(3,:)<0) = [];
         
@@ -214,9 +219,6 @@ for i = t_start:length(t)-1
         
         protons = [protons additions];
     end
-    
-    
-    
     
     if size(protons, 2) > 0
         
@@ -241,12 +243,13 @@ for i = t_start:length(t)-1
         % Remove protons outside permissable set of coordinates
         % If a proton hits a wall, remove it. Otherwise we need to consider
         % rebound angles
-        protons_final(:,protons_final(1,:)>=sensor_xsize) = [];
-        protons_final(:,protons_final(1,:)<=0) = [];
-        protons_final(:,protons_final(2,:)>=sensor_ysize) = [];
-        protons_final(:,protons_final(2,:)<=0) = [];
+        protons_final(:,protons_final(1,:)>=sensor_xsize+chip.wall_separation_xpos) = [];
+        protons_final(:,protons_final(1,:)<=chip.wall_separation_xneg) = [];
+        protons_final(:,protons_final(2,:)>=sensor_ysize+chip.wall_serparation_ypos) = [];
+        protons_final(:,protons_final(2,:)<=chip.wall_separation_yneg) = [];
         protons_final(:,protons_final(3,:)>=solution_height) = [];
         protons_final(:,protons_final(3,:)<=0) = [];
+        protons_final(:, (protons_final(4,:)./time_step)+i>length(t)) = [];
 %         disp('protons_final after removal:')
 %         disp(protons_final)
         
@@ -256,17 +259,23 @@ for i = t_start:length(t)-1
         protons_final(2,:) = ceil(protons_final(2,:)./chip.isfet_length);
         protons_final(4,:) = ceil(protons_final(4,:)./time_step);
         
-        % Add protons to that sensor at the right time step        
-        for c = 1:size(protons_final, 2)
-            %idx = (y-1)*20 + x --> assuming both x and y are 1-indexed
-            %because MATLAB
+        % Add protons to that sensor at the right time step     
 %             x = protons_final(1,c)
 %             y = protons_final(2,c)
-%             index = x+(y-1)*20
-%             timesteps_ = i + protons_final(4,c):length(t)
-            sensor_nH(protons_final(1,c)+(protons_final(2,c)-1)*20, i+protons_final(4,c):length(t)) = ...
-                sensor_nH(protons_final(1,c)+(protons_final(2,c)-1)*20, i+protons_final(4,c):length(t)) + 1;
+%             index = x+(y-1)*chip.N_x
+%             timesteps = i + protons_final(4,c):length(t) (protons persist
+%             from the time they were released till the end of the
+%             reaction)
+        for c = 1:size(protons_final, 2)
+            % Instantaneous
+            sensor_nH(protons_final(1,c)+(protons_final(2,c)-1)*chip.N_x, i+protons_final(4,c)) = ...
+                sensor_nH(protons_final(1,c)+(protons_final(2,c)-1)*chip.N_x, i+protons_final(4,c)) + 1;
+            
+            % Cumulative
+            cum_nH(protons_final(1,c)+(protons_final(2,c)-1)*chip.N_x, i+protons_final(4,c):length(t)) = ...
+                cum_nH(protons_final(1,c)+(protons_final(2,c)-1)*chip.N_x, i+protons_final(4,c):length(t)) + 1;
         end
+        
         %% Plot
         
         if plotflag_proton_release ==1
@@ -287,14 +296,18 @@ disp('end of reaction')
 disp(toc)
 
 figure
-sensor_nH_total = sum(sensor_nH, 1);
+sensor_nH_total = sum(cum_nH, 1);
 plot(t, sensor_nH_total)
 title('Total Number of Protons Against Time')
 
 figure
-plot(t, sensor_nH)
+plot(t, cum_nH)
 title('Total Number of Protons per sensor Against Time')
 
 figure
-plot(t, mean(sensor_nH,1))
+plot(t, mean(cum_nH,1))
 title('Mean Number of Protons Against Time')
+%%
+if plotflag_2d_surface == 1
+    plot2DProtonRelease(cum_nH, chip, time_step, 'cumulative_z_90_percent.avi');
+end

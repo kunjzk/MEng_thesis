@@ -3,17 +3,16 @@ function plotClustersAndProtons(clusters, protons, chip, solution_height, t)
     
     
     %Scatter plot DNA clusters
-    dna = scatter3(cat(1,ceil(clusters.centre_x./chip.isfet_length)),...
-                   cat(1,ceil(clusters.centre_y./chip.isfet_width)),...
-                   cat(1,ceil(clusters.centre_z./(chip.height_unit*chip.z_scale))), 'LineWidth', 3);
+    dna = scatter3(cat(1,clusters.centre_x./chip.isfet_length),...
+                   cat(1,clusters.centre_y./chip.isfet_width),...
+                   cat(1,clusters.centre_z./chip.height_unit), 'LineWidth', 3);
     
     hold on
     pos_x = (protons(1,:)./chip.isfet_length);
     pos_y = (protons(2,:)./chip.isfet_width);
-    pos_z = (protons(3,:)./chip.height_unit);
+    pos_z = (protons(3,:)./(chip.height_unit));
     prot = scatter3(pos_x, pos_y, pos_z, '.', 'LineWidth', 3);
     
-
     
     [X,Y] = meshgrid(1:chip.N_x, 1:chip.N_y);
     h = surf(X, Y, zeros(chip.N_y, chip.N_x), 'FaceAlpha', 0.5, 'EdgeColor', [0.5 0.5 0.5]);
