@@ -16,5 +16,7 @@ Contains data from 5 experiments, as well as the algorithm running on Lacewing t
 
 Powerpoint presentation and report are included.
 
-## Enjoy!
+<hline>
+
+<h2> Enjoy! <h2>
 
