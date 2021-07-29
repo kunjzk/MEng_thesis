@@ -12,5 +12,9 @@ Contains code for the new mathematical model as well as scripts used to generate
 
 Contains data from 5 experiments, as well as the algorithm running on Lacewing that preprocesses this data to produce figures. Ripped from the Lacewing_UI repository (can't remember exactly where it was). C'est La Vie
 
+## Final deliverables
 
-Enjoy!
+Powerpoint presentation and report are included.
+
+## Enjoy!
+
