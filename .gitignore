@@ -1,2 +1,3 @@
 *.fig
 *.txt
+.DS_Store
